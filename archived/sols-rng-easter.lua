@@ -1,3 +1,4 @@
+-- loadstring(game:HttpGet('https://raw.githubusercontent.com/euryz/euryz/refs/heads/main/archived/sols-rng-easter.lua'))()
 --[[
     SOLS RNG — Egg Farm v2
     Dark Horizontal GUI | Mobile Optimized
