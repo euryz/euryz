@@ -1,4 +1,4 @@
-loadstring(game:HttpGet('https://raw.githubusercontent.com/euryz/euryz/refs/heads/main/archived/eleriumv2/main.lua', true))()
+local library = loadstring(game:HttpGet('https://raw.githubusercontent.com/euryz/euryz/refs/heads/main/archived/eleriumv2/main.lua', true))()
 
 local window = library:AddWindow("SkyWars GUI thing", {
 	main_color = Color3.fromRGB(41, 74, 122),
