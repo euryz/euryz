@@ -25,7 +25,7 @@ local tabSelection = Instance.new("ImageLabel")
 local tabButtons = Instance.new("Frame")
 local uiListLayout = Instance.new("UIListLayout")
 local frame = Instance.new("Frame")
-local tab = Instance.new("Frame")
+local tab = Instance.new("ScrollingFrame")
 local uiListLayout2 = Instance.new("UIListLayout")
 local textBox = Instance.new("TextBox")
 local textBoxRoundify4px = Instance.new("ImageLabel")
@@ -220,8 +220,13 @@ tab.Name = "Tab"
 tab.Parent = prefabs
 tab.BackgroundColor3 = Color3.new(1, 1, 1)
 tab.BackgroundTransparency = 1
+tab.BorderSizePixel = 0
 tab.Size = UDim2.new(1, 0, 1, 0)
 tab.Visible = false
+tab.CanvasSize = UDim2.new(0, 0, 0, 0)
+tab.ScrollBarThickness = 4
+tab.ScrollingDirection = Enum.ScrollingDirection.Y
+tab.VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
 
 uiListLayout2.Parent = tab
 uiListLayout2.SortOrder = Enum.SortOrder.LayoutOrder
@@ -943,12 +948,30 @@ function library:FormatWindows()
 	format_windows()
 end
 
+function library:SetToggleKey(key)
+	if typeof(key) == "string" then
+		key = hasprop(Enum.KeyCode, key)
+	end
+	if typeof(key) == "EnumItem" and key.EnumType == Enum.KeyCode then
+		ui_options.toggle_key = key
+	end
+	return ui_options.toggle_key
+end
+
+function library:GetToggleKey()
+	return ui_options.toggle_key
+end
+
 function library:AddWindow(title, options)
 	windows = windows + 1
 	local dropdown_open = false
 	title = tostring(title or "New Window")
 	options = (typeof(options) == "table") and options or ui_options
 	options.tween_time = 0.1
+
+	if options.toggle_key ~= nil then
+		library:SetToggleKey(options.toggle_key)
+	end
 
 	local Window = prefabs:FindFirstChild("Window"):Clone()
 	Window.Parent = windowsFrame
@@ -1111,6 +1134,40 @@ function library:AddWindow(title, options)
 				local new_tab = prefabs:FindFirstChild("Tab"):Clone()
 				new_tab.Parent = tabs
 				new_tab.ZIndex = new_tab.ZIndex + (windows * 10)
+
+				local tab_layout = new_tab:FindFirstChildOfClass("UIListLayout")
+				local dropdown_boxes = {}
+				local over_scrollbar = false
+
+				spawn(function()
+					while true do
+						local len = tab_layout.AbsoluteContentSize.Y
+						for i, v in pairs(dropdown_boxes) do
+							if not i.Parent then
+								dropdown_boxes[i] = nil
+							elseif i.AbsoluteSize.Y > 0 then
+								len = math.max(len, i.AbsolutePosition.Y + i.AbsoluteSize.Y - new_tab.AbsolutePosition.Y + new_tab.CanvasPosition.Y + 5)
+							end
+						end
+						new_tab.CanvasSize = UDim2.new(0, 0, 0, len)
+						new_tab.ScrollBarImageColor3 = options.main_color
+						RS.Heartbeat:Wait()
+					end
+				end)
+
+				new_tab.MouseMoved:Connect(function()
+					local hovering = new_tab.AbsoluteCanvasSize.Y > new_tab.AbsoluteWindowSize.Y and gMouse().X >= new_tab.AbsolutePosition.X + new_tab.AbsoluteSize.X - new_tab.ScrollBarThickness - 4
+					if hovering ~= over_scrollbar then
+						over_scrollbar = hovering
+						Window.Draggable = not hovering
+					end
+				end)
+				new_tab.MouseLeave:Connect(function()
+					if over_scrollbar then
+						over_scrollbar = false
+						Window.Draggable = true
+					end
+				end)
 
 				local function show()
 					if dropdown_open then return end
@@ -1440,6 +1497,7 @@ function library:AddWindow(title, options)
 						dropdown.Parent = new_tab
 						dropdown.Text = "      " .. dropdown_name
 						box.Size = UDim2.new(1, 0, 0, 0)
+						dropdown_boxes[box] = true
 
 						local open = false
 						dropdown.MouseButton1Click:Connect(function()
@@ -1456,6 +1514,14 @@ function library:AddWindow(title, options)
 								dropdown_open = true
 								Resize(box, {Size = UDim2.new(1, 0, 0, len)}, options.tween_time)
 								Resize(indicator, {Rotation = 90}, options.tween_time)
+								spawn(function()
+									wait(options.tween_time)
+									RS.Heartbeat:Wait()
+									local bottom = box.AbsolutePosition.Y + box.AbsoluteSize.Y - new_tab.AbsolutePosition.Y + 5
+									if open and dropdown_open and bottom > new_tab.AbsoluteWindowSize.Y then
+										Resize(new_tab, {CanvasPosition = Vector2.new(0, new_tab.CanvasPosition.Y + bottom - new_tab.AbsoluteWindowSize.Y)}, options.tween_time)
+									end
+								end)
 							else -- Close
 								dropdown_open = false
 								Resize(box, {Size = UDim2.new(1, 0, 0, 0)}, options.tween_time)
@@ -1636,7 +1702,15 @@ local object = prefabs:FindFirstChild("DropdownButton"):Clone()
 
 						console.Parent = new_tab
 						console.ZIndex = console.ZIndex + (windows * 10)
-						console.Size = UDim2.new(1, 0, console_options.full and 1 or 0, console_options.y)
+						console.Size = UDim2.new(1, 0, 0, console_options.y)
+
+						if console_options.full then
+							local function fit()
+								console.Size = UDim2.new(1, 0, 0, new_tab.AbsoluteWindowSize.Y + console_options.y)
+							end
+							fit()
+							new_tab:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+						end
 
 						local sf = console:GetChildren()[1]
 						local Source = sf:FindFirstChild("Source")
